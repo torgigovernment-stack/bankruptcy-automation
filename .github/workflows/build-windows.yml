@@ -1,0 +1,38 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:  # запуск вручную из Actions
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Download poppler (pdftotext)
+        run: |
+          curl -L -o poppler.zip https://github.com/oschwartz10612/poppler-windows/releases/download/v24.08.0-0/Release-24.08.0-0.zip
+          Expand-Archive poppler.zip -DestinationPath poppler-tmp
+          mkdir bin -Force
+          Copy-Item "poppler-tmp\poppler-24.08.0\Library\bin\*" -Destination "bin\" -Recurse -Force
+
+      - name: Build EXE
+        run: pyinstaller build.spec
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Список_кредиторов
+          path: dist/Список_кредиторов.exe

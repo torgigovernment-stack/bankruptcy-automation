@@ -1,0 +1,28 @@
+# Реальные данные клиентов — НЕ коммитить
+input/credit_history.pdf
+input/enforcement_proceedings.docx
+output/
+
+# PyInstaller сборка (генерируется в Actions)
+build/
+dist/
+*.spec.bak
+bin/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Промежуточные файлы инструкции
+ИНСТРУКЦИЯ.html
