@@ -16,9 +16,17 @@ a = Analysis(
     datas=[
         ('input/creditors_template.docx', 'input'),
         ('bin', 'bin'),  # папка с pdftotext.exe и .dll
-        ('src', 'src'),
+        ('web.py', '.'),
     ],
-    hiddenimports=['flask', 'docx', 'lxml.etree'],
+    hiddenimports=[
+        'flask', 'docx', 'lxml', 'lxml.etree',
+        'web',
+        'src',
+        'src.parse_credit_history',
+        'src.parse_proceedings',
+        'src.matcher',
+        'src.build_document',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
