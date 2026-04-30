@@ -27,13 +27,17 @@ def _find_pdftotext() -> str:
 
 def extract_text(pdf_path: str) -> str:
     pdftotext_bin = _find_pdftotext()
+    # ВАЖНО: читаем в бинарном режиме и декодируем UTF-8 явно.
+    # На Windows с русской локалью subprocess по умолчанию пытается декодировать
+    # через cp1251 → UnicodeDecodeError на UTF-8 выводе pdftotext.
     result = subprocess.run(
-        [pdftotext_bin, pdf_path, '-'],
-        capture_output=True, text=True
+        [pdftotext_bin, '-enc', 'UTF-8', pdf_path, '-'],
+        capture_output=True
     )
     if result.returncode != 0:
-        raise RuntimeError(f"pdftotext failed: {result.stderr}")
-    return result.stdout
+        err = result.stderr.decode('utf-8', errors='replace') if result.stderr else ''
+        raise RuntimeError(f"pdftotext failed: {err}")
+    return result.stdout.decode('utf-8', errors='replace')
 
 
 def parse_creditors(text: str) -> list[dict]:

@@ -3,7 +3,10 @@
 Запуск: python3 web.py  →  http://localhost:5001
 """
 import io
+import os
+import sys
 import json
+import traceback
 from pathlib import Path
 from flask import Flask, request, send_file
 
@@ -13,8 +16,25 @@ from src.matcher import match_proceedings_to_creditors, build_section2
 from src.build_document import build_document
 
 app = Flask(__name__)
-BASE = Path(__file__).parent
+
+# В PyInstaller-сборке шаблон лежит в _MEIPASS/input/
+if hasattr(sys, '_MEIPASS'):
+    BASE = Path(sys._MEIPASS)
+else:
+    BASE = Path(__file__).parent
 TEMPLATE = BASE / 'input' / 'creditors_template.docx'
+
+# Путь к логу (рядом с .exe)
+EXE_DIR = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+LOG_FILE = EXE_DIR / 'launcher_log.txt'
+
+
+def _log(msg: str):
+    try:
+        with open(LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(msg + '\n')
+    except Exception:
+        pass
 
 HTML = """<!DOCTYPE html>
 <html lang="ru">
@@ -128,35 +148,53 @@ def process():
         return 'Оба файла обязательны', 400
 
     import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        pdf_path = tmp / 'credit_history.pdf'
-        docx_path = tmp / 'proceedings.docx'
-        output_path = tmp / 'result.docx'
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            pdf_path = tmp / 'credit_history.pdf'
+            docx_path = tmp / 'proceedings.docx'
+            output_path = tmp / 'result.docx'
 
-        pdf_file.save(str(pdf_path))
-        docx_file.save(str(docx_path))
+            pdf_file.save(str(pdf_path))
+            docx_file.save(str(docx_path))
+            _log(f'[process] PDF: {pdf_path.stat().st_size} байт, DOCX: {docx_path.stat().st_size} байт')
 
-        # Пайплайн
-        text = extract_text(str(pdf_path))
-        creditors = parse_creditors(text)
-        proceedings = parse_proceedings(str(docx_path))
-        creditors, unmatched = match_proceedings_to_creditors(creditors, proceedings)
-        section2 = build_section2(proceedings)
-        matched = {'section1': creditors, 'section2': section2, 'unmatched': unmatched}
-        build_document(matched, str(TEMPLATE), str(output_path))
+            # Пайплайн
+            _log('[process] extract_text...')
+            text = extract_text(str(pdf_path))
+            _log(f'[process] извлечено {len(text)} символов')
 
-        # Читаем в память до закрытия tmpdir
-        with open(output_path, 'rb') as f:
-            result = io.BytesIO(f.read())
+            _log('[process] parse_creditors...')
+            creditors = parse_creditors(text)
+            _log(f'[process] кредиторов: {len(creditors)}')
 
-    result.seek(0)
-    return send_file(
-        result,
-        as_attachment=True,
-        download_name='creditors_list.docx',
-        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    )
+            _log('[process] parse_proceedings...')
+            proceedings = parse_proceedings(str(docx_path))
+            _log(f'[process] ИП: {len(proceedings)}')
+
+            creditors, unmatched = match_proceedings_to_creditors(creditors, proceedings)
+            section2 = build_section2(proceedings)
+            matched = {'section1': creditors, 'section2': section2, 'unmatched': unmatched}
+
+            _log('[process] build_document...')
+            build_document(matched, str(TEMPLATE), str(output_path))
+
+            with open(output_path, 'rb') as f:
+                result = io.BytesIO(f.read())
+            _log('[process] OK')
+
+        result.seek(0)
+        return send_file(
+            result,
+            as_attachment=True,
+            download_name='creditors_list.docx',
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+    except Exception:
+        err = traceback.format_exc()
+        _log('[process] ОШИБКА:\n' + err)
+        # Возвращаем трейсбэк в браузер — приложение локальное, безопасно
+        return f'<pre style="white-space:pre-wrap;font-family:monospace">{err}</pre>', 500
 
 
 if __name__ == '__main__':
