@@ -6,6 +6,7 @@ output/
 # PyInstaller сборка (генерируется в Actions)
 build/
 dist/
+release/
 *.spec.bak
 bin/
 
